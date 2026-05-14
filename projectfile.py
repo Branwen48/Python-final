@@ -1,4 +1,6 @@
 from urllib.request import urlopen
+from urllib.parse import urlencode
+import json
 from collections import Counter
 import sqlite3 
 import tkinter as TK
@@ -9,6 +11,38 @@ cur = con.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS books(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, url TEXT)");
 cur.execute("CREATE TABLE IF NOT EXISTS word_counts (id INTEGER PRIMARY KEY AUTOINCREMENT,book_id INTEGER NOT NULL,word TEXT NOT NULL,count INTEGER NOT NULL,FOREIGN KEY (book_id) REFERENCES books(id)");
 con.commit()
+
+def findgbook(title):
+    search_url="https://gutendex.com/books?" + urlencode({"search": title,"languages": "en"})
+    response=urlopen(search_url)
+    data=json.loads(response.read().decode())
+
+    if data["count"]==0:
+        return None
+    
+    book = data["results"][0]
+    book_title = book["title"]
+    formats = book["formats"]
+    text_url=None
+
+    for file_type,file_url in formats.items():
+        if file_type.startswith("text/plain"):
+            text_url=file_url
+            break
+    if text_url is None:
+        return None
+    return book_title,text_url
+
+def loaddatabase(title):
+    result=findgbook(title)
+    if result is None:
+        return "book was not found"
+    book_title , text_url=result
+    content = scraper(text_url)
+    most_common=commonfinder(content)
+    save_book(book_title,text_url,most_common)
+    return "\n".join(f"{word}: {count}" for word, count in most_common)
+
 
 def save_book(title, url, most_common):
     cur.execute("INSERT INTO books (title, url) VALUES (?, ?)",(title, url));
@@ -36,10 +70,7 @@ STOP_WORDS = {
 
 def commonfinder(content):
     wordlist = re.findall(r"\b[a-z]+\b", content.lower())
-    filtered_words = [
-        word for word in wordlist
-        if word not in STOP_WORDS
-    ]
+    filtered_words = [word for word in wordlist if word not in STOP_WORDS]
     most_common = Counter(filtered_words).most_common(10)
     return most_common
 
@@ -54,3 +85,6 @@ def titlefinder(content):
 def urlfromdatabase(title):
     cur.execute("SELECT url FROM books WHERE title LIKE ?",(f"%{title}%",));
     return cur.fetchall()
+
+
+     
