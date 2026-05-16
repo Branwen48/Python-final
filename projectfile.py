@@ -14,7 +14,7 @@ import re
 con = sqlite3.connect('web.db')
 cur = con.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS books(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, url TEXT)")
-cur.execute("CREATE TABLE IF NOT EXISTS word_counts (id INTEGER PRIMARY KEY AUTOINCREMENT,book_id INTEGER NOT NULL,word TEXT NOT NULL,count INTEGER NOT NULL,FOREIGN KEY (book_id) REFERENCES books(id)")
+cur.execute("CREATE TABLE IF NOT EXISTS word_counts (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL, word TEXT NOT NULL, count INTEGER NOT NULL, FOREIGN KEY (book_id) REFERENCES books(id))")
 con.commit()
 
 def findgbook(title):
@@ -61,10 +61,11 @@ def loadurl(url):
         most_common = commonfinder(content)
         save_book(title, url, most_common)
         return commonreturner(most_common)
-    except:
-        return "book was not found"
+    except Exception as e:
+        return f"book was not found\n{e}"
     
 def titlefinder(content):
+    '''finds the title from the html doc'''
     title = content.split("title: ", 1)[1].split("author:", 1)[0].strip()
     return title
 
@@ -100,7 +101,7 @@ STOP_WORDS = {
     "from", "not", "so", "if", "then", "there",
     "their", "his", "her", "my", "me", "him", "them", "our",
     "your", "what", "which", "who", "when", "where", "why",
-    "how", "all", "any", "can", "do", "did", "does"
+    "how", "all", "any", "can", "do", "did", "does", "t", "s"
 }
 
 def commonfinder(content):
@@ -111,8 +112,55 @@ def commonfinder(content):
     return most_common
 
 def commonreturner(most_common):
-    '''takes a dictionary of most_common and returns it into a nicely formatted output string'''
+    '''takes a list of tuples of most_common and returns it into a nicely formatted output string'''
     return "\n".join(f"{word}: {count}" for word, count in most_common)
 
+def show_result(result):
+    '''displays a result string in the tkinter output'''
+    output_box.delete("1.0", TK.END)
+    output_box.insert(TK.END, result)
+    
+def searchtitlebutton():
+    '''gets the title from the GUI, and searches the database or gutenberg'''
+    title=title_entry.get().strip()
+    if title=="":
+        show_result("enter a book title")
+    else:
+        show_result(searchdatabase(title))
 
-     
+def loadurlbutton():
+    '''gets the url from the gui, loads the book into database'''
+    url= url_entry.get().strip()
+    if url=="":
+        show_result("Enter a project gutenberg url")
+    else:
+        show_result(loadurl(url))
+
+window = TK.Tk()
+window.title("Project Gutenberg Common Word Machine")
+
+title_label=TK.Label(window,text="Search by book title")
+title_label.pack()
+
+title_entry=TK.Entry(window,width=70)
+title_entry.pack()
+
+title_button=TK.Button(window, text="Search title",command=searchtitlebutton)
+title_button.pack()
+
+url_label=TK.Label(window,text="Add book by project gutenberg url")
+url_label.pack()
+
+url_entry=TK.Entry(window,width=70)
+url_entry.pack()
+
+url_button=TK.Button(window,text="Load url", command=loadurlbutton)
+url_button.pack()
+
+output_label = TK.Label(window, text="top 10 words")
+output_label.pack()
+
+output_box=TK.Text(window, width=70, height=12)
+output_box.pack()
+
+window.mainloop()
